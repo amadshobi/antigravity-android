@@ -15,7 +15,7 @@ after="$(sha256sum "$TMP/web/main.js" | cut -d' ' -f1)"
 grep -Fq 'src="./generated/main.js"' "$TMP/web/index.html"
 
 # Verify no double IIFE wrappers in generated bundles (excluding vendor main.js)
-for f in "$TMP"/web/generated/boot/*.js "$TMP"/web/generated/patches/*.js; do
+for f in "$TMP"/web/generated/boot/*.js "$TMP"/web/generated/patches/*.js "$TMP"/web/generated/extensions/*.js; do
     [ -f "$f" ] || continue
     if awk '
         BEGIN { iife_opens = 0; in_block = 0 }

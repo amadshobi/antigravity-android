@@ -56,3 +56,13 @@ src/patches/startup_ready/console-hook.js
 src/patches/startup_ready/detect-ui.js
 src/patches/startup_ready/arm.js
 src/patches/startup_ready/public-api.js
+
+bundle iife extensions/extension_host.js
+src/extensions/namespace.js
+src/extensions/dom_hook.js
+src/extensions/ui_registry.js
+src/extensions/event_bus.js
+src/extensions/plugin_loader.js
+src/extensions/builtins/desktop_mode.js
+src/extensions/public_api.js
+
