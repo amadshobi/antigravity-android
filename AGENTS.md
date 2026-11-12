@@ -51,7 +51,8 @@ Web layer:
 
 ## CI & release
 - Only workflow: `.github/workflows/build-and-release.yml`. Runs on tag `v*`, push to `dev`, or manual dispatch; builds all three APKs plus `SHA256SUMS.txt` and uploads artifact `antigravity-binaries`.
-- The publish step is gated on `refs/tags/v`; a manual `workflow_dispatch` never publishes a release even though it asks for `tag_name`.
+- The publish step is gated on `refs/tags/v`; a manual `workflow_dispatch` never publishes a release even though it asks for `tag_name`. Dispatching with `--ref <tag>` *does* publish, because `github.ref` is the tag.
+- Observed once: pushing tag `v2.4.2` created no run at all. After tagging, check `gh run list`; if no run exists, use `gh workflow run build-and-release.yml --ref <tag>` to build and publish from that tag.
 - Release = bump `APP_VERSION_NAME`/`APP_VERSION_CODE` in `config/app.env` (+ `RELEASE_NOTES.md`), commit, then push tag `v<APP_VERSION_NAME>`.
 - Commit messages follow Conventional Commits (`feat:`, `fix(ci):`, `chore(release):`).
 
