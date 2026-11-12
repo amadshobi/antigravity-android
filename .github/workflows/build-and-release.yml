@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag (e.g. v2.4.2)'
+        description: 'Release Tag (e.g. v2.4.3)'
         required: false
-        default: 'v2.4.2'
+        default: 'v2.4.3'
       draft:
         description: 'Create Draft Release'
         type: boolean
@@ -155,6 +155,7 @@ jobs:
 
             ### Key Highlights in this Release
 
+            * **Extension Header Placement Fix (v2.4.3):** The extension action bar now docks left of the app's top-right header cluster and falls back below the header when the settings button is absent, so it no longer covers the settings icon or steals its taps. Status indicators became a transparent, non-blocking cluster.
             * **Web UI Extension Host:** New `window.AGY` extension API (plugin lifecycle with automatic disposers, CSS/header/status injection, theme events) plus an always-visible Desktop Mode quick toggle — no React JSX patching required.
             * **Runtime Plugin Router (opt-in):** `AGY_ENABLE_PLUGINS=1` lets external plugins subscribe to core event streams; workspace plugins additionally require `AGY_PLUGINS_ALLOW_WORKSPACE=1`, entrypoints are path-contained, and hung plugins are killed on timeout.
             * **Dev APK Edition:** `antigravity-dev-region-bypass.apk` (com.agy.dev, port 45158, debuggable) ships alongside the standard builds for side-by-side testing.
