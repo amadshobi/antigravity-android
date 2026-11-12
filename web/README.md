@@ -216,8 +216,8 @@ web/
 | `AGY.plugins.get(id)` / `AGY.plugins.list()` | Доступ к зарегистрированным плагинам. |
 | `AGY.plugins.loadScript(url, onLoad, onError)` | Динамическая загрузка JS-файла плагина (`<script async>`). Механизма автодискавери плагинов пока нет: источник должен вызвать `loadScript` сам. |
 | `AGY.ui.injectCSS(id, css)` | Инъекция `<style>` в `<head>`, возвращает disposer. |
-| `AGY.ui.registerHeaderAction({id, title, icon, onClick})` | Кнопка в фиксированной панели `#agy-header-actions-bar` (top-right), `aria-label` из `title`. |
-| `AGY.ui.registerStatusIndicator({id, content, title, onClick})` | Плашка в `#agy-status-bar`; при `onClick` получает `role="button"`, `tabindex="0"` и обработку Enter/Space. |
+| `AGY.ui.registerHeaderAction({id, title, icon, onClick})` | Кнопка в панели `#agy-header-actions-bar`, `aria-label` из `title`. Панель стыкуется слева от правого кластера кнопок шапки (`[data-testid="mobile-open-settings"]` и его родитель), по центру по вертикали; если кнопка настроек не смонтирована (desktop-вариант, другой экран), панель уходит под шапку (`calc(env(safe-area-inset-top) + 48px)`), а не поверх нее. Контейнер имеет `pointer-events:none`, кликабельны только сами кнопки. |
+| `AGY.ui.registerStatusIndicator({id, content, title, onClick})` | Плашка в `#agy-status-bar`; при `onClick` получает `role="button"`, `tabindex="0"` и обработку Enter/Space. Контейнер — прозрачный кластер слева внизу (`pointer-events:none`, отступ через `--agy-status-offset`), фон и клики принадлежат самим плашкам, поэтому нижняя панель ввода не перекрывается. |
 | `AGY.ui.waitForElement(selector, cb, timeoutMs)` / `AGY.ui.observeContainer(selector, onMount)` | Устойчивые к перерисовкам React точки монтирования (MutationObserver), возвращают disposer. |
 | `AGY.events.on/off/emit` | Внутренняя pub/sub шина; `themeChange` эмитится только при фактической смене темы. |
 

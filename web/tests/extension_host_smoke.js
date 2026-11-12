@@ -35,7 +35,13 @@ class FakeElement {
     this.title = '';
     this.tabIndex = -1;
     this.type = '';
+    this.rect = { left: 0, top: 0, width: 0, height: 0 };
   }
+  getBoundingClientRect() {
+    const r = this.rect;
+    return { left: r.left, top: r.top, width: r.width, height: r.height, right: r.left + r.width, bottom: r.top + r.height };
+  }
+  get parentElement() { return this.parentNode; }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null; }
   appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
@@ -74,14 +80,37 @@ function createSandbox() {
     return null;
   };
 
+  const matchesSelector = (el, selector) => {
+    const byTestId = /^\[data-testid="([^"]+)"\]$/.exec(selector);
+    if (byTestId) return el.getAttribute('data-testid') === byTestId[1];
+    if (selector.charAt(0) === '#') return el.id === selector.slice(1);
+    return false;
+  };
+
+  const querySelector = (selector) => {
+    const walk = (node) => {
+      if (matchesSelector(node, selector)) return node;
+      for (const child of node.children) {
+        const found = walk(child);
+        if (found) return found;
+      }
+      return null;
+    };
+    return walk(documentElement);
+  };
+
+  const observers = [];
+
   const document = {
     documentElement,
     head,
     body,
     createElement: (tag) => new FakeElement(tag),
     getElementById: (id) => findElement(documentElement, id),
-    querySelector: () => null,
+    querySelector: querySelector,
   };
+
+  const windowListeners = {};
 
   const sandbox = {
     document,
@@ -93,15 +122,29 @@ function createSandbox() {
     },
     HTMLElement: FakeElement,
     MutationObserver: class {
+      constructor(callback) {
+        this.callback = callback;
+        observers.push(this);
+      }
       observe() {}
       disconnect() {}
+      trigger() { this.callback([]); }
     },
+    innerWidth: 360,
+    // Synchronous in the sandbox so layout assertions run without timers.
+    requestAnimationFrame: (cb) => { cb(0); return 0; },
     setTimeout: (fn) => setTimeout(fn, 0),
     clearTimeout: (timer) => clearTimeout(timer),
     _elements: { head, body, documentElement },
+    _FakeElement: FakeElement,
+    _observers: observers,
+    _flushObservers: () => observers.forEach((observer) => observer.trigger()),
   };
   sandbox.window = sandbox;
-  sandbox.window.addEventListener = () => {};
+  sandbox.window.addEventListener = (type, handler) => {
+    (windowListeners[type] = windowListeners[type] || []).push(handler);
+  };
+  sandbox._windowListeners = windowListeners;
   return sandbox;
 }
 
@@ -208,6 +251,78 @@ check('a plugin that throws during activate leaves no UI behind', () => {
   });
   assert.strictEqual(ok, false);
   assert.strictEqual(findById(sandbox._elements.body, 'agy-action-throwing-action'), null);
+});
+
+check('header bar docks left of the app settings button', () => {
+  const anchor = new sandbox._FakeElement('button');
+  anchor.setAttribute('data-testid', 'mobile-open-settings');
+  anchor.rect = { left: 300, top: 10, width: 32, height: 32 };
+  sandbox._elements.body.appendChild(anchor);
+
+  sandbox._flushObservers();
+
+  const bar = findById(sandbox._elements.body, 'agy-header-actions-bar');
+  assert.strictEqual(bar.style.right, '68px', 'right = viewport - anchor.left + gap (360 - 300 + 8)');
+  assert.strictEqual(bar.style.top, '26px', 'vertically centred on the anchor (10 + 32/2)');
+  assert.strictEqual(bar.style.transform, 'translateY(-50%)');
+  assert.ok(bar.style.cssText.indexOf('pointer-events:none') !== -1, 'container must not swallow taps');
+  const btn = findById(bar, 'agy-action-ui-plugin-action');
+  assert.ok(btn.style.cssText.indexOf('pointer-events:auto') !== -1, 'buttons stay clickable');
+});
+
+check('header bar docks left of the whole header button cluster', () => {
+  const body = sandbox._elements.body;
+  body.children
+    .filter((c) => c.getAttribute('data-testid') === 'mobile-open-settings')
+    .forEach((c) => body.removeChild(c));
+
+  const cluster = new sandbox._FakeElement('div');
+  cluster.rect = { left: 240, top: 8, width: 112, height: 40 };
+  const anchor = new sandbox._FakeElement('button');
+  anchor.setAttribute('data-testid', 'mobile-open-settings');
+  anchor.rect = { left: 300, top: 12, width: 32, height: 32 };
+  cluster.appendChild(anchor);
+  body.appendChild(cluster);
+  sandbox._cluster = cluster;
+
+  sandbox._flushObservers();
+
+  const bar = findById(body, 'agy-header-actions-bar');
+  assert.strictEqual(bar.style.right, '128px', 'right = viewport - cluster.left + gap (360 - 240 + 8)');
+  assert.strictEqual(bar.style.top, '28px', 'centred on the cluster (8 + 40/2), not the single button');
+});
+
+check('header bar ignores the sidebar settings item and falls back below the header', () => {
+  const body = sandbox._elements.body;
+  if (sandbox._cluster && sandbox._cluster.parentNode) {
+    body.removeChild(sandbox._cluster);
+  }
+
+  const sidebarItem = new sandbox._FakeElement('div');
+  sidebarItem.setAttribute('data-testid', 'settings-button');
+  sidebarItem.rect = { left: 8, top: 420, width: 200, height: 32 };
+  body.appendChild(sidebarItem);
+  sandbox._flushObservers();
+
+  const bar = findById(body, 'agy-header-actions-bar');
+  assert.strictEqual(bar.style.right, '12px', 'sidebar settings must not drag the bar into the sidebar');
+  assert.ok(bar.style.top.indexOf('safe-area-inset-top') !== -1, 'fallback must clear the app header');
+
+  body.removeChild(sidebarItem);
+  sandbox._flushObservers();
+  assert.strictEqual(findById(body, 'agy-header-actions-bar').style.right, '12px');
+});
+
+check('status cluster is non-blocking and pills own their background', () => {
+  const bar = findById(sandbox._elements.body, 'agy-status-bar');
+  assert.ok(bar.style.cssText.indexOf('pointer-events:none') !== -1, 'cluster must not block input taps');
+  assert.ok(bar.style.cssText.indexOf('right:0') === -1, 'no full-width overlay strip');
+  assert.ok(bar.style.cssText.indexOf('background:transparent') !== -1);
+  assert.ok(bar.style.cssText.indexOf('safe-area-inset-bottom') !== -1);
+
+  const pill = findById(sandbox._elements.body, 'agy-status-pill-status');
+  assert.ok(pill.style.cssText.indexOf('pointer-events:auto') !== -1);
+  assert.ok(pill.style.cssText.indexOf('border-radius:999px') !== -1);
 });
 
 console.log(failures === 0 ? '=== ALL SMOKE TESTS PASSED ===' : '=== ' + failures + ' SMOKE TEST(S) FAILED ===');
