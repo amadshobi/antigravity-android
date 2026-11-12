@@ -1,4 +1,4 @@
-# Antigravity for Android v2.4.1
+# Antigravity for Android v2.4.2
 
 ## Спецификация пакетов релиза
 
@@ -6,7 +6,34 @@
 | :--- | :--- | :--- | :--- |
 | **`antigravity.apk`** | `com.agy` | 45157 | Стандартная редакция с оригинальными проверками Google (чистая версия без модификаций кода аутентификации). |
 | **`antigravity-region-bypass.apk`** | `com.agy` | 45157 | Редакция с обходом проверки учетных записей (позволяет авторизоваться под аккаунтами, блокируемыми со стороны Google; требует наличия сетевого туннеля/VPN). |
+| **`antigravity-dev-region-bypass.apk`** | `com.agy.dev` | 45158 | Dev-редакция с обходом проверки и `debuggable=true` для параллельной установки и тестирования. |
 | **`SHA256SUMS.txt`** | — | — | Криптографические контрольные суммы бинарных файлов. |
+
+---
+
+## Изменения и исправления (v2.4.2)
+
+### 1. Web UI Extension Host
+* Добавлен изолированный бандл `generated/extensions/extension_host.js`, публикующий API `window.AGY` (`plugins.register/get/list/loadScript`, `ui.injectCSS/registerHeaderAction/registerStatusIndicator/waitForElement/observeContainer`, `events.on/off/emit`).
+* Жизненный цикл плагина освобождает ресурсы автоматически: повторная регистрация и исключение в `activate()` откатывают созданные элементы, CSS и подписки.
+* Улучшена доступность: статус-плашки получают `role`, `tabindex` и обработку Enter/Space, кнопки шапки — `aria-label`.
+* Событие `themeChange` теперь эмитится только при фактической смене темы.
+* Встроенный `builtin-desktop-mode` добавляет быстрый переключатель Desktop Mode в шапку и использует то же состояние, что и переключатель в Appearance.
+
+### 2. Runtime-плагины шины I/O (opt-in)
+* `plugin_router.py` обнаруженные плагины подключает к `EventBroker` через `attach_plugins(broker)` в `fifo_input.py`, `unix_socket_input.py` и `stream_splitter.py`.
+* По умолчанию выключено: `AGY_ENABLE_PLUGINS=1` для домашних плагинов, `AGY_PLUGINS_ALLOW_WORKSPACE=1` — для `<cwd>/.agents/plugins`.
+* Runtime-скрипт обязан находиться внутри каталога плагина; таймаут убивает процесс, ненулевой код возврата и хвост `stderr` попадают в лог.
+* В `EventBroker` добавлен `unregister_handler()`; перезагрузка плагинов не дублирует обработчики.
+
+### 3. Сборка и релиз
+* В релиз добавлена dev-редакция APK (`com.agy.dev`, порт 45158, debuggable) для параллельной установки.
+* Все редакции по-прежнему подписываются общим `tools/debug.keystore`, поэтому обновление поверх предыдущих версий выполняется без переустановки.
+
+### 4. Тесты и документация
+* Новый headless smoke-тест Extension Host (`web/tests/extension_host_smoke.js`) и расширенный `test_extension_host.sh`, подключённый к `web/tests/selftest.sh`.
+* `modules/io/tests/test_plugin_router.py` покрывает opt-in, фильтрацию событий, отказ от path traversal, kill по таймауту и отсутствие дублей после перезагрузки.
+* Добавлен корневой `AGENTS.md`; обновлены `web/README.md` и `modules/io/README.md`.
 
 ---
 
