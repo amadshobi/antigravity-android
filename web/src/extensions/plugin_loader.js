@@ -34,6 +34,17 @@ function createPluginStorage(pluginId) {
   };
 }
 
+function runDisposers(disposers) {
+  for (var i = disposers.length - 1; i >= 0; i--) {
+    try {
+      if (typeof disposers[i] === 'function') disposers[i]();
+    } catch (e) {
+      warn('plugin dispose', e);
+    }
+  }
+  disposers.length = 0;
+}
+
 function registerPlugin(id, definition) {
   if (!id || typeof id !== 'string') {
     error('registerPlugin', 'Invalid plugin id');
@@ -49,7 +60,10 @@ function registerPlugin(id, definition) {
     if (typeof _plugins[id].deactivate === 'function') {
       try { _plugins[id].deactivate(); } catch (e) { warn('deactivate', e); }
     }
+    runDisposers(_plugins[id].disposers);
   }
+
+  var disposers = [];
 
   var context = {
     id: id,
@@ -57,14 +71,38 @@ function registerPlugin(id, definition) {
     version: definition.version || '1.0.0',
     storage: createPluginStorage(id),
     ui: {
-      injectCSS: function(cssId, content) { return injectCSS(id + '_' + cssId, content); },
-      registerHeaderAction: registerHeaderAction,
-      registerStatusIndicator: registerStatusIndicator,
-      waitForElement: waitForElement,
-      observeContainer: observeContainer
+      injectCSS: function(cssId, content) {
+        var dispose = injectCSS(id + '_' + cssId, content);
+        disposers.push(dispose);
+        return dispose;
+      },
+      registerHeaderAction: function(options) {
+        var dispose = registerHeaderAction(options);
+        disposers.push(dispose);
+        return dispose;
+      },
+      registerStatusIndicator: function(options) {
+        var indicator = registerStatusIndicator(options);
+        disposers.push(function() { indicator.remove(); });
+        return indicator;
+      },
+      waitForElement: function(selector, callback, timeoutMs) {
+        var dispose = waitForElement(selector, callback, timeoutMs);
+        disposers.push(dispose);
+        return dispose;
+      },
+      observeContainer: function(selector, onMount) {
+        var dispose = observeContainer(selector, onMount);
+        disposers.push(dispose);
+        return dispose;
+      }
     },
     events: {
-      on: on,
+      on: function(event, handler) {
+        var dispose = on(event, handler);
+        disposers.push(dispose);
+        return dispose;
+      },
       off: off,
       emit: emit
     }
@@ -77,12 +115,14 @@ function registerPlugin(id, definition) {
       name: definition.name || id,
       version: definition.version || '1.0.0',
       definition: definition,
-      deactivate: definition.deactivate
+      deactivate: definition.deactivate,
+      disposers: disposers
     };
     log('Plugin activated: ' + id + ' (v' + (definition.version || '1.0.0') + ')');
     emit('pluginActivated', { id: id });
     return true;
   } catch (err) {
+    runDisposers(disposers);
     error('activate plugin ' + id, err);
     return false;
   }

@@ -1,8 +1,11 @@
 /**
  * extensions/builtins/desktop_mode.js - Built-in Desktop Mode Extension.
  *
- * Provides responsive desktop/mobile viewport toggle via AGY Extension API,
- * replacing brittle AST/regex modifications of upstream React bundles.
+ * Quick-access desktop/mobile viewport toggle in the global header, wired to the
+ * same state as the Appearance settings switch (window.Android Desktop Mode bridge
+ * + the `ag_desktop_mode` localStorage key). The settings switch is still injected
+ * into main.js by web/patch_main.py; this builtin only adds a second, always-visible
+ * entry point, so both controls must keep sharing one source of truth.
  */
 
 function initDesktopModeExtension() {

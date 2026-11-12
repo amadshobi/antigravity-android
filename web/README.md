@@ -82,12 +82,17 @@ web/
 │       ├── touch_model_menu.js
 │       ├── theme_sync.js
 │       └── startup_ready.js
+│   └── extensions/
+│       └── extension_host.js     # Extension Host: window.AGY API + встроенный Desktop Mode
 ├── src/                          # Модульные исходники фрагментов бандлов
 │   ├── boot/                     # Фрагменты раннего старта
 │   ├── core/                     # Фрагменты ядра моста (namespace, csrf, fetch, ...)
+│   ├── extensions/               # Исходники Extension Host (namespace, ui_registry, event_bus, ...)
 │   └── patches/                  # Фрагменты функциональных патчей
 └── tests/
-    └── selftest.sh               # Тест сборки и проверки целостности исходников
+    ├── selftest.sh               # Тест сборки и проверки целостности исходников
+    ├── test_extension_host.sh    # Структура, порядок загрузки и runtime-smoke Extension Host
+    └── extension_host_smoke.js   # Headless smoke-тест window.AGY в vm-песочнице
 ```
 
 ---
@@ -113,6 +118,7 @@ web/
 | **`patches/touch_model_menu.js`** | IIFE | ~6.7 KB | Адаптация hover-меню выбора моделей Base UI под сенсорный ввод. |
 | **`patches/theme_sync.js`** | IIFE | ~4.7 KB | MutationObserver за классами `<html>`/`<body>` и передача смены темы в нативный Android. |
 | **`patches/startup_ready.js`** | IIFE | ~4.7 KB | Детектор первого полезного рендера DOM и перехватчик JS-ошибок для `AndroidBridge`. |
+| **`extensions/extension_host.js`** | IIFE | ~18 KB | Публичный API `window.AGY` (плагины, UI-инъекции, шина событий) и встроенный Desktop Mode. |
 | **`main.js`** | Raw + Patch | ~9.5 MB | Рабочий бандл React UI, пропатченный скриптом `patch_main.py`. |
 
 ### Проверка валидности (Verification)
@@ -201,6 +207,24 @@ web/
 - **Diff Calculation (`diff_worker.js`)**: вычисление статистики изменений строк (алгоритм Майерса $O(ND)$ с отсечением совпадающих префиксов и суффиксов) вынесено в Web Worker.
 - **Voice / Audio Processor (`audio_processor.js`)**: зарегистрирован как `AudioWorkletProcessor` с именем `audio-streaming-processor`. Осуществляет потоковый даунсемплинг аудиопотока микрофона до 16 кГц PCM (`Int16Array`) для отправки в мультимодальные модели.
 
+### 6.5. Extension Host (`generated/extensions/extension_host.js`)
+Изолированный IIFE-бандл, публикующий `window.AGY` — точку расширения UI без правки React JSX и upstream-бандла. Загружается в `index.html` до `generated/main.js`.
+
+| API | Назначение |
+|---|---|
+| `AGY.plugins.register(id, {activate(ctx), deactivate?})` | Регистрация плагина. Контекст дает `ctx.storage` (namespaced `localStorage`), `ctx.ui` и `ctx.events`. |
+| `AGY.plugins.get(id)` / `AGY.plugins.list()` | Доступ к зарегистрированным плагинам. |
+| `AGY.plugins.loadScript(url, onLoad, onError)` | Динамическая загрузка JS-файла плагина (`<script async>`). Механизма автодискавери плагинов пока нет: источник должен вызвать `loadScript` сам. |
+| `AGY.ui.injectCSS(id, css)` | Инъекция `<style>` в `<head>`, возвращает disposer. |
+| `AGY.ui.registerHeaderAction({id, title, icon, onClick})` | Кнопка в фиксированной панели `#agy-header-actions-bar` (top-right), `aria-label` из `title`. |
+| `AGY.ui.registerStatusIndicator({id, content, title, onClick})` | Плашка в `#agy-status-bar`; при `onClick` получает `role="button"`, `tabindex="0"` и обработку Enter/Space. |
+| `AGY.ui.waitForElement(selector, cb, timeoutMs)` / `AGY.ui.observeContainer(selector, onMount)` | Устойчивые к перерисовкам React точки монтирования (MutationObserver), возвращают disposer. |
+| `AGY.events.on/off/emit` | Внутренняя pub/sub шина; `themeChange` эмитится только при фактической смене темы. |
+
+Жизненный цикл: все disposer'ы, полученные через `ctx.ui`/`ctx.events`, регистрируются автоматически. Повторный `register` с тем же `id` вызывает `deactivate()` предыдущей версии и освобождает ее UI/CSS/подписки; плагин, бросивший исключение в `activate()`, откатывает уже созданные элементы.
+
+Встроенные расширения (`src/extensions/builtins/`): `builtin-desktop-mode` — быстрое переключение Desktop Mode в header. Оно пишет тот же `ag_desktop_mode` и вызывает `Android.setDesktopMode()`, что и переключатель в Appearance (инжектится `patch_main.py`), поэтому оба элемента управления опираются на единый источник состояния.
+
 ---
 
 ## 7. Результаты аудита: архитектурные костыли и рекомендации
@@ -235,3 +259,4 @@ bash web/tests/selftest.sh
 4. Проверку, что исходный `main.js` остался неизменным.
 5. Проверку генерации всех файлов и валидность путей в `index.html`.
 6. Верификацию отсутствия повторных IIFE-оберток в сгенерированных бандлах.
+7. Запуск `web/tests/test_extension_host.sh`: проверку объявления фрагментов в `src.manifest`, порядка загрузки перед `generated/main.js`, `node --check` и headless smoke-теста `window.AGY` (`extension_host_smoke.js`).

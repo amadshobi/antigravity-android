@@ -36,4 +36,7 @@ for f in "$TMP"/web/generated/boot/*.js "$TMP"/web/generated/patches/*.js "$TMP"
     fi
 done
 
+# Extension Host structure, load order and runtime API (includes node smoke tests).
+bash "$TMP/web/tests/test_extension_host.sh"
+
 echo "web build selftest: OK"

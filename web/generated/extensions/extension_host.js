@@ -118,9 +118,6 @@ function observeContainer(selector, onMount) {
  * status bar pills, and inject custom CSS themes without modifying React JSX.
  */
 
-var _injectedStyles = {};
-var _headerActions = [];
-var _statusIndicators = [];
 var _headerContainer = null;
 var _statusContainer = null;
 
@@ -134,13 +131,11 @@ function injectCSS(id, cssContent) {
     (document.head || document.documentElement).appendChild(existing);
   }
   existing.textContent = cssContent;
-  _injectedStyles[id] = existing;
 
   return function() {
     if (existing && existing.parentNode) {
       existing.parentNode.removeChild(existing);
     }
-    delete _injectedStyles[id];
   };
 }
 
@@ -181,10 +176,12 @@ function registerHeaderAction(options) {
   }
 
   var actionId = options.id;
+  var label = options.title || actionId;
   var btn = document.createElement('button');
   btn.id = 'agy-action-' + actionId;
   btn.className = 'agy-action-btn p-1.5 rounded-md hover:bg-white/10 active:scale-95 transition-all text-slate-300 hover:text-white';
-  btn.title = options.title || actionId;
+  btn.title = label;
+  btn.setAttribute('aria-label', label);
   btn.type = 'button';
   btn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;background:rgba(30,41,59,0.7);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px;color:#cbd5e1;';
 
@@ -212,47 +209,57 @@ function registerHeaderAction(options) {
   var container = ensureHeaderContainer();
   container.appendChild(btn);
 
-  _headerActions.push({ id: actionId, element: btn });
-
   return function() {
     if (btn && btn.parentNode) {
       btn.parentNode.removeChild(btn);
     }
-    _headerActions = _headerActions.filter(function(a) { return a.id !== actionId; });
   };
 }
 
 function registerStatusIndicator(options) {
   if (!options || !options.id) {
     warn('registerStatusIndicator', 'Missing indicator id');
-    return function() {};
+    return { update: function() {}, remove: function() {} };
   }
 
+  var clickable = typeof options.onClick === 'function';
   var pill = document.createElement('div');
   pill.id = 'agy-status-pill-' + options.id;
   pill.className = 'agy-status-pill px-2 py-0.5 flex items-center gap-1 font-mono text-[11px]';
+  pill.setAttribute('role', clickable ? 'button' : 'status');
 
   if (typeof options.content === 'string') {
     pill.textContent = options.content;
+    if (!options.title) pill.setAttribute('aria-label', options.content);
   } else if (options.content instanceof HTMLElement) {
     pill.appendChild(options.content);
   }
+  if (options.title) {
+    pill.title = options.title;
+    pill.setAttribute('aria-label', options.title);
+  }
 
-  if (typeof options.onClick === 'function') {
+  if (clickable) {
+    pill.tabIndex = 0;
     pill.style.cursor = 'pointer';
     pill.addEventListener('click', function(e) {
+      try { options.onClick(e); } catch (err) { error('statusIndicator onClick', err); }
+    });
+    pill.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+      e.preventDefault();
       try { options.onClick(e); } catch (err) { error('statusIndicator onClick', err); }
     });
   }
 
   var container = ensureStatusContainer();
   container.appendChild(pill);
-  _statusIndicators.push({ id: options.id, element: pill });
 
   return {
     update: function(newContent) {
       if (typeof newContent === 'string') {
         pill.textContent = newContent;
+        if (!options.title) pill.setAttribute('aria-label', newContent);
       } else if (newContent instanceof HTMLElement) {
         pill.innerHTML = '';
         pill.appendChild(newContent);
@@ -262,7 +269,6 @@ function registerStatusIndicator(options) {
       if (pill && pill.parentNode) {
         pill.parentNode.removeChild(pill);
       }
-      _statusIndicators = _statusIndicators.filter(function(s) { return s.id !== options.id; });
     }
   };
 }
@@ -274,6 +280,7 @@ function registerStatusIndicator(options) {
  */
 
 var _listeners = {};
+var _lastTheme = null;
 
 function on(event, handler) {
   if (typeof handler !== 'function') return function() {};
@@ -306,9 +313,16 @@ function emit(event, payload) {
   }
 }
 
+// Emits themeChange only when the resolved theme actually changes.
+function emitTheme(value) {
+  if (!value || value === _lastTheme) return;
+  _lastTheme = value;
+  emit('themeChange', value);
+}
+
 // Wire system theme notifications to extensions
 window.addEventListener('agy:theme-change', function(e) {
-  emit('themeChange', e && e.detail ? e.detail : 'system');
+  emitTheme(e && e.detail ? e.detail : 'system');
 });
 
 // Observe HTML theme attribute changes
@@ -317,7 +331,7 @@ if (window.MutationObserver) {
     for (var i = 0; i < mutations.length; i++) {
       if (mutations[i].attributeName === 'class' || mutations[i].attributeName === 'data-theme') {
         var isDark = document.documentElement.classList.contains('dark');
-        emit('themeChange', isDark ? 'dark' : 'light');
+        emitTheme(isDark ? 'dark' : 'light');
       }
     }
   });
@@ -360,6 +374,17 @@ function createPluginStorage(pluginId) {
   };
 }
 
+function runDisposers(disposers) {
+  for (var i = disposers.length - 1; i >= 0; i--) {
+    try {
+      if (typeof disposers[i] === 'function') disposers[i]();
+    } catch (e) {
+      warn('plugin dispose', e);
+    }
+  }
+  disposers.length = 0;
+}
+
 function registerPlugin(id, definition) {
   if (!id || typeof id !== 'string') {
     error('registerPlugin', 'Invalid plugin id');
@@ -375,7 +400,10 @@ function registerPlugin(id, definition) {
     if (typeof _plugins[id].deactivate === 'function') {
       try { _plugins[id].deactivate(); } catch (e) { warn('deactivate', e); }
     }
+    runDisposers(_plugins[id].disposers);
   }
+
+  var disposers = [];
 
   var context = {
     id: id,
@@ -383,14 +411,38 @@ function registerPlugin(id, definition) {
     version: definition.version || '1.0.0',
     storage: createPluginStorage(id),
     ui: {
-      injectCSS: function(cssId, content) { return injectCSS(id + '_' + cssId, content); },
-      registerHeaderAction: registerHeaderAction,
-      registerStatusIndicator: registerStatusIndicator,
-      waitForElement: waitForElement,
-      observeContainer: observeContainer
+      injectCSS: function(cssId, content) {
+        var dispose = injectCSS(id + '_' + cssId, content);
+        disposers.push(dispose);
+        return dispose;
+      },
+      registerHeaderAction: function(options) {
+        var dispose = registerHeaderAction(options);
+        disposers.push(dispose);
+        return dispose;
+      },
+      registerStatusIndicator: function(options) {
+        var indicator = registerStatusIndicator(options);
+        disposers.push(function() { indicator.remove(); });
+        return indicator;
+      },
+      waitForElement: function(selector, callback, timeoutMs) {
+        var dispose = waitForElement(selector, callback, timeoutMs);
+        disposers.push(dispose);
+        return dispose;
+      },
+      observeContainer: function(selector, onMount) {
+        var dispose = observeContainer(selector, onMount);
+        disposers.push(dispose);
+        return dispose;
+      }
     },
     events: {
-      on: on,
+      on: function(event, handler) {
+        var dispose = on(event, handler);
+        disposers.push(dispose);
+        return dispose;
+      },
       off: off,
       emit: emit
     }
@@ -403,12 +455,14 @@ function registerPlugin(id, definition) {
       name: definition.name || id,
       version: definition.version || '1.0.0',
       definition: definition,
-      deactivate: definition.deactivate
+      deactivate: definition.deactivate,
+      disposers: disposers
     };
     log('Plugin activated: ' + id + ' (v' + (definition.version || '1.0.0') + ')');
     emit('pluginActivated', { id: id });
     return true;
   } catch (err) {
+    runDisposers(disposers);
     error('activate plugin ' + id, err);
     return false;
   }
@@ -450,8 +504,11 @@ function loadExtensionScript(url, onLoad, onError) {
 /**
  * extensions/builtins/desktop_mode.js - Built-in Desktop Mode Extension.
  *
- * Provides responsive desktop/mobile viewport toggle via AGY Extension API,
- * replacing brittle AST/regex modifications of upstream React bundles.
+ * Quick-access desktop/mobile viewport toggle in the global header, wired to the
+ * same state as the Appearance settings switch (window.Android Desktop Mode bridge
+ * + the `ag_desktop_mode` localStorage key). The settings switch is still injected
+ * into main.js by web/patch_main.py; this builtin only adds a second, always-visible
+ * entry point, so both controls must keep sharing one source of truth.
  */
 
 function initDesktopModeExtension() {

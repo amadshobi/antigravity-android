@@ -64,7 +64,8 @@
     <!--
       Locked AGY UI load order (do not reorder):
       web_optimizations.js -> touch_model_menu.js -> theme_sync.js
-      -> bridge.core.js -> prism_bundle.js (defer) -> main.js
+      -> bridge.core.js -> extensions/extension_host.js
+      -> prism_bundle.js (defer) -> main.js
 
       bridge.cache.js was removed: main.js never referenced window.__agCache,
       and the fetch interceptor is an unnecessary failure surface. core's fetch

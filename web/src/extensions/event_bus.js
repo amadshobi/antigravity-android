@@ -5,6 +5,7 @@
  */
 
 var _listeners = {};
+var _lastTheme = null;
 
 function on(event, handler) {
   if (typeof handler !== 'function') return function() {};
@@ -37,9 +38,16 @@ function emit(event, payload) {
   }
 }
 
+// Emits themeChange only when the resolved theme actually changes.
+function emitTheme(value) {
+  if (!value || value === _lastTheme) return;
+  _lastTheme = value;
+  emit('themeChange', value);
+}
+
 // Wire system theme notifications to extensions
 window.addEventListener('agy:theme-change', function(e) {
-  emit('themeChange', e && e.detail ? e.detail : 'system');
+  emitTheme(e && e.detail ? e.detail : 'system');
 });
 
 // Observe HTML theme attribute changes
@@ -48,7 +56,7 @@ if (window.MutationObserver) {
     for (var i = 0; i < mutations.length; i++) {
       if (mutations[i].attributeName === 'class' || mutations[i].attributeName === 'data-theme') {
         var isDark = document.documentElement.classList.contains('dark');
-        emit('themeChange', isDark ? 'dark' : 'light');
+        emitTheme(isDark ? 'dark' : 'light');
       }
     }
   });
