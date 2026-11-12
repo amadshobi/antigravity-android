@@ -98,6 +98,19 @@ public final class AndroidBridge {
         ui.setDesktopMode(enabled);
     }
 
+    @JavascriptInterface
+    public void openRemoteSettings() {
+        final MainActivity act = activityRef != null ? activityRef.get() : MainActivity.activeActivity;
+        if (act != null) {
+            act.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    com.agy.remote.RemoteSettingsDialog.show(act);
+                }
+            });
+        }
+    }
+
     // Native-only helpers used while preparing the trusted app document.
     public boolean isEngineReady() {
         return engine.isReady();

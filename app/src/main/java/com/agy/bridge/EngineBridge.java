@@ -18,6 +18,9 @@ public final class EngineBridge {
     }
 
     public int getPort() {
+        if (CoreRuntimeState.serverUrl != null) {
+            return CoreRuntimeState.httpsPort;
+        }
         return runtime.getHttpsPort();
     }
 

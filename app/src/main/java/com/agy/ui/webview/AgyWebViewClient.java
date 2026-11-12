@@ -138,8 +138,15 @@ public final class AgyWebViewClient extends WebViewClient {
 
     @Override
     public void onReceivedSslError(WebView v, SslErrorHandler handler, SslError error) {
-        Log.w(TAG, "rejecting TLS error in WebView: "
-                + SensitiveDataRedactor.safeUrl(error != null ? error.getUrl() : null));
+        String url = error != null ? error.getUrl() : null;
+        Log.w(TAG, "TLS error in WebView: "
+                + SensitiveDataRedactor.safeUrl(url));
+        if (com.agy.remote.RemoteConfigPrefs.isRemoteMode()) {
+            // In Remote Mode, allow self-signed / local development SSL certificates
+            Log.i(TAG, "Proceeding with remote SSL certificate for Remote Mode");
+            handler.proceed();
+            return;
+        }
         // The embedded core certificate is trusted through network_security_config.
         // Any remaining TLS error is unexpected and must fail closed.
         handler.cancel();

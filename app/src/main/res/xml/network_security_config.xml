@@ -19,10 +19,11 @@
         </trust-anchors>
     </domain-config>
 
-    <!-- Everything else: system trust anchors, no cleartext. -->
-    <base-config cleartextTrafficPermitted="false">
+    <!-- Base config: permit cleartext for local network / remote PC endpoints -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>

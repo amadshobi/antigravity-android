@@ -36,7 +36,7 @@ public final class EngineConfigJson {
             o.put("coreVersion", RuntimeConfig.CORE_VERSION);
             o.put("releaseChannel", RuntimeConfig.DEBUG ? "dev" : "stable");
             o.put("devMode", RuntimeConfig.DEBUG);
-            o.put("enginePort", runtime.getHttpsPort());
+            o.put("enginePort", engine.getPort());
             o.put("engineBaseUrl", engine.getBaseUrl());
             o.put("filesDir", appContext.getFilesDir().getAbsolutePath());
             o.put("runtimeDir", runtime.getRuntimeDir().getAbsolutePath());

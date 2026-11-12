@@ -57,6 +57,7 @@ public final class SplashLoadingHtml {
                 + "    <span class=\"animate-dot-bounce\" style=\"animation-delay:120ms;\"></span>\n"
                 + "    <span class=\"animate-dot-bounce\" style=\"animation-delay:240ms;\"></span>\n"
                 + "  </span>\n"
+                + "  <div onclick=\"if(window.SplashRetry&&window.SplashRetry.openRemoteSettings)window.SplashRetry.openRemoteSettings()\" style=\"position:absolute;bottom:28px;font-size:12px;font-family:system-ui,-apple-system,sans-serif;opacity:0.5;cursor:pointer;padding:6px 14px;border-radius:14px;background:rgba(128,128,128,0.2);letter-spacing:0.3px;\">⚙ Remote PC Mode</div>\n"
                 + "</body>\n"
                 + "</html>\n";
     }

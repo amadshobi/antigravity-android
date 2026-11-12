@@ -43,7 +43,8 @@ public final class AppLoader {
         } else {
             hostTheme = "system";
         }
-        String origin = "https://127.0.0.1:" + port + "/";
+        String base = bridge.getEngineBaseUrl();
+        String origin = (base != null && base.endsWith("/")) ? base : (base + "/");
         String historyUrl = origin + "?hostTheme=" + hostTheme;
         webView.loadDataWithBaseURL(origin, AppHtmlInjector.inject(html, bridge, theme),
                 "text/html", "UTF-8", historyUrl);

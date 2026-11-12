@@ -27,10 +27,13 @@ public final class SplashOverlayHtml {
         String button = retryable
                 ? "  <div class=\"btn-group\">\n"
                 + "    <button class=\"btn retry\" onclick=\"agyRetry()\">Retry</button>\n"
+                + "    <button class=\"btn sec\" onclick=\"agyRemoteSettings()\">Remote Server</button>\n"
                 + "    <button class=\"btn sec\" onclick=\"agyCopyLogs()\">Copy Logs</button>\n"
                 + "    <button class=\"btn sec\" onclick=\"agySaveLogs()\">Save Logs</button>\n"
                 + "  </div>\n"
-                : "";
+                : "  <div class=\"btn-group\">\n"
+                + "    <button class=\"btn sec\" onclick=\"agyRemoteSettings()\">Remote Server</button>\n"
+                + "  </div>\n";
         return "<!DOCTYPE html>\n"
                 + "<html>\n"
                 + "<head>\n"
@@ -106,6 +109,11 @@ public final class SplashOverlayHtml {
                 + "    function agySaveLogs() {\n"
                 + "      if (window.SplashRetry && window.SplashRetry.saveLogs) {\n"
                 + "        window.SplashRetry.saveLogs();\n"
+                + "      }\n"
+                + "    }\n"
+                + "    function agyRemoteSettings() {\n"
+                + "      if (window.SplashRetry && window.SplashRetry.openRemoteSettings) {\n"
+                + "        window.SplashRetry.openRemoteSettings();\n"
                 + "      }\n"
                 + "    }\n"
                 + "  </script>\n"

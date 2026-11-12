@@ -168,6 +168,17 @@ public class MainActivity extends Activity
     }
 
     private void startCoreService() {
+        com.agy.remote.RemoteConfigPrefs.init(this);
+        if (com.agy.remote.RemoteConfigPrefs.isRemoteMode(this)) {
+            String remoteBase = com.agy.remote.RemoteConfigPrefs.getBaseUrl(this);
+            Log.i(TAG, "Remote Mode is active (" + remoteBase + "); bypassing local core service.");
+            CoreRuntimeState.serverUrl = remoteBase;
+            CoreRuntimeState.httpsPort = com.agy.remote.RemoteConfigPrefs.getRemotePort(this);
+            CoreRuntimeState.csrfToken = com.agy.remote.RemoteConfigPrefs.getCsrfToken(this);
+            CoreRuntimeState.readyGeneration = 1;
+            CoreRuntimeState.lastError = null;
+            return;
+        }
         try {
             CoreServiceLauncher.start(this);
         } catch (Exception e) {
@@ -188,6 +199,10 @@ public class MainActivity extends Activity
         loadedGeneration = -1;
         splashDeadline = System.currentTimeMillis() + SPLASH_TIMEOUT_MS;
         splash.showLoading();
+        if (com.agy.remote.RemoteConfigPrefs.isRemoteMode(this)) {
+            handler.postDelayed(this::startCoreService, 300);
+            return;
+        }
         CoreServiceLauncher.stop(this);
         try {
             java.io.File marker = new java.io.File(runtimeManager.getRuntimeDir(), com.agy.runtime.RuntimePaths.RUNTIME_MARKER);

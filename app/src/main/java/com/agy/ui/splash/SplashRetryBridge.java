@@ -70,5 +70,19 @@ public final class SplashRetryBridge {
                 }
             });
         }
+
+        @JavascriptInterface
+        public void openRemoteSettings() {
+            MAIN.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (context instanceof android.app.Activity) {
+                        com.agy.remote.RemoteSettingsDialog.show((android.app.Activity) context);
+                    } else if (com.agy.ui.MainActivity.activeActivity != null) {
+                        com.agy.remote.RemoteSettingsDialog.show(com.agy.ui.MainActivity.activeActivity);
+                    }
+                }
+            });
+        }
     }
 }
