@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(IO_ROOT, "core_bus"))
 
 import envelope
 from event_broker import EventBroker
+from plugin_router import attach_plugins
 
 def run_socket_listener(socket_path: str, broker: EventBroker, max_connections: int = 0):
     if os.path.exists(socket_path):
@@ -58,6 +59,7 @@ def main():
     
     sock_path = sys.argv[1]
     broker = EventBroker()
+    attach_plugins(broker)
     print(f"[SocketInput] Listening on UNIX socket: {sock_path}")
     run_socket_listener(sock_path, broker)
 

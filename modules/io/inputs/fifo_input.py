@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.join(IO_ROOT, "core_bus"))
 
 import envelope
 from event_broker import EventBroker
+from plugin_router import attach_plugins
 
 FUSE_PREFIXES = ("/storage/", "/sdcard/", "/mnt/sdcard/", "/mnt/runtime/")
 
@@ -114,6 +115,7 @@ def main():
     if safe_path != path:
         print(f"[FifoInput] Redirected FUSE path '{path}' to safe path '{safe_path}'")
     broker = EventBroker()
+    attach_plugins(broker)
     print(f"[FifoInput] Listening on FIFO: {safe_path}")
     run_fifo_listener(safe_path, broker)
 

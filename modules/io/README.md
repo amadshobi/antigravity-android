@@ -112,7 +112,26 @@
   2. **External Script Handlers**: вызовы внешних shell- и python-скриптов из директории `outputs/`.
 - Вызов внешних обработчиков осуществляется через `subprocess.Popen` с передачей JSON-конверта через `stdin` и настраиваемым таймаутом выполнения (по умолчанию 5 секунд).
 - **Защита от зомби-процессов и утечек FD**: при возникновении `subprocess.TimeoutExpired` гарантированно вызываются `proc.kill()`, `proc.wait()` для утилизации процесса из таблицы ОС и закрываются потоковые дескрипторы `stdin`/`stderr`.
+- **Отмена подписки**: `unregister_handler(pattern, callable)` удаляет ранее зарегистрированный in-memory колбэк (используется плагинами при перезагрузке).
 - Учитывает ограничения Android: на `/storage/emulated/0` (монтирование `noexec`) `.sh` файлы запускаются с явным указанием интерпретатора (`/system/bin/sh` или `bash`).
+
+### 3.3. Runtime-плагины (`plugin_router.py`)
+- Плагин — каталог с `plugin.json` и runtime-скриптом, который получает по одному JSON-конверту на строку через `stdin`:
+  ```json
+  {
+    "name": "My Plugin",
+    "version": "1.0.0",
+    "entrypoints": {"runtime": "hook.py"},
+    "events": ["agent.*", "system.error"]
+  }
+  ```
+- **Выключено по умолчанию**: сканирование и запуск выполняются только при `AGY_ENABLE_PLUGINS=1`. Каталоги: `~/.gemini/config/plugins/`, `~/.gemini/plugins/`.
+- **Плагины из воркспейса** (`<cwd>/.agents/plugins`) требуют дополнительного явного согласия `AGY_PLUGINS_ALLOW_WORKSPACE=1` — клонирование недоверенного репозитория само по себе не исполняет код.
+- **Границы путей**: runtime-скрипт обязан лежать внутри каталога своего плагина (`realpath` + `commonpath`), абсолютные пути и `../` отклоняются.
+- **Подписка**: один фильтрующий обработчик на плагин (`fnmatch` по `events`), поэтому событие не дублируется при нескольких совпадающих паттернах или повторном `attach`.
+- **Таймаут и диагностика**: таймаут берется из `EventBroker.dispatch_timeout` (0.1–30 с), по истечении процесс убивается; ненулевой код возврата и хвост `stderr` пишутся в лог.
+- **Перезагрузка**: `reload_plugins()` снимает старые обработчики и перепривязывает новые без дублирования.
+- **Вход в пайплайн**: `attach_plugins(broker)` вызывается в `fifo_input.py`, `unix_socket_input.py` и `stream_splitter.py`.
 
 ---
 
@@ -193,6 +212,7 @@ bash modules/io/tests/run_all.sh
 | `test_event_broker.py` | `SubscriberRouter`, `EventBroker` | Wildcard-фильтрация маршрутов (`*`, `core.*`), in-memory диспетчеризация, таймаут внешних скриптов с вызовом `proc.kill()`/`proc.wait()` и закрытием FD (`test_03_timeout_cleanup`) |
 | `test_fifo_io.py` | `fifo_input.py`, `EventBroker` | Интеграционный тест: создание FIFO, фоновый поток слушателя, публикация и прием события, перенаправление FUSE-путей, неблокирующая запись без читателя |
 | `test_stream_splitter.py` | `stream_splitter.py`, фильтры | Прогон через `io.StringIO`: сохранение исходного потока + генерация `core.url.open` и `system.error`, асинхронная очередь событий через `queue.Queue` без задержек потока ядра |
+| `test_plugin_router.py` | `plugin_router.py`, `EventBroker` | Дискавери и фильтрация событий, выключенность по умолчанию, отказ от `../`/абсолютных runtime-путей, kill по таймауту, репорт `stderr`/exit code, отсутствие дублей после `reload_plugins()`, opt-in для `.agents/plugins` |
 | `run_all.sh` | Все компоненты | Синтаксическая валидация Python (`compileall`) и Bash (`bash -n`) + последовательный запуск модульных тестов |
 
 ---

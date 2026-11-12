@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(SCRIPT_DIR, "filters"))
 
 import envelope
 from event_broker import EventBroker
+from plugin_router import attach_plugins
 import filter_open_url
 import filter_task_events
 import filter_error_alerts
@@ -83,6 +84,7 @@ def process_stream(stream_in, stream_out, broker: EventBroker, max_lines: int = 
 
 def main():
     broker = EventBroker()
+    attach_plugins(broker)
     process_stream(sys.stdin, sys.stdout, broker)
 
 if __name__ == "__main__":

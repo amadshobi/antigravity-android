@@ -27,6 +27,19 @@ class EventBroker:
             self.in_memory_handlers[pattern] = []
         self.in_memory_handlers[pattern].append(handler_callable)
 
+    def unregister_handler(self, pattern: str, handler_callable) -> bool:
+        """Removes a previously registered handler. Returns True when it was present."""
+        handlers = self.in_memory_handlers.get(pattern)
+        if not handlers:
+            return False
+        try:
+            handlers.remove(handler_callable)
+        except ValueError:
+            return False
+        if not handlers:
+            del self.in_memory_handlers[pattern]
+        return True
+
     def publish(self, event_dict: Dict[str, Any], timeout: float = None) -> List[str]:
         envelope.validate_event(event_dict)
         event_name = event_dict["event"]

@@ -72,5 +72,20 @@ class TestEventBroker(unittest.TestCase):
                 os.remove(hang_script)
             os.rmdir(tmp_dir)
 
+    def test_04_unregister_handler(self):
+        broker = EventBroker()
+        received = []
+
+        def my_handler(ev):
+            received.append(ev["event"])
+
+        broker.register_handler("agent.*", my_handler)
+        self.assertTrue(broker.unregister_handler("agent.*", my_handler))
+        self.assertFalse(broker.unregister_handler("agent.*", my_handler))
+        self.assertNotIn("agent.*", broker.in_memory_handlers)
+
+        broker.publish(envelope.create_event("agent.started", "source"))
+        self.assertEqual(received, [])
+
 if __name__ == "__main__":
     unittest.main()
